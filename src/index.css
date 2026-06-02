@@ -90,9 +90,8 @@ body {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: radial-gradient(circle at 15% 15%, rgba(243, 115, 93, 0.18) 0%, transparent 55%),
-              radial-gradient(circle at 85% 85%, rgba(142, 46, 62, 0.22) 0%, transparent 55%),
-              radial-gradient(circle at 50% 50%, rgba(226, 88, 110, 0.12) 0%, transparent 60%),
+  background: radial-gradient(circle at 15% 15%, var(--secondary-glow) 0%, transparent 55%),
+              radial-gradient(circle at 85% 85%, var(--primary-glow) 0%, transparent 55%),
               var(--bg-primary);
   padding: 1.5rem;
   overflow: hidden;
@@ -236,4 +235,114 @@ h1, h2, h3, h4 {
   font-size: 2.2rem;
   font-weight: 800;
   text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* Carbon Black Theme */
+.theme-black {
+  --bg-primary: #050505;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1e1e1e;
+  
+  --primary: #00e5ff;       /* Electric Cyan */
+  --primary-glow: rgba(0, 229, 255, 0.25);
+  --secondary: #a855f7;     /* Neon Purple */
+  --secondary-glow: rgba(168, 85, 247, 0.25);
+  --accent: #00e5ff;
+  
+  --text-main: #ffffff;
+  --text-muted: #9e9e9e;
+  --text-dark: #555555;
+  
+  --glass-bg: rgba(18, 18, 18, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
+  
+  --shadow-glow: 0 0 35px rgba(0, 229, 255, 0.25);
+}
+
+/* Frost White Light Theme */
+.theme-white {
+  --bg-primary: #eef1f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #dce3ee;
+  
+  --primary: #4f46e5;       /* Indigo */
+  --primary-glow: rgba(79, 70, 229, 0.2);
+  --secondary: #06b6d4;     /* Cyan */
+  --secondary-glow: rgba(6, 182, 212, 0.2);
+  --accent: #ec4899;       /* Pink Accent */
+  
+  --text-main: #1f2937;     /* Charcoal Dark */
+  --text-muted: #4b5563;    /* Muted Slate */
+  --text-dark: #9ca3af;     /* Light Gray Border Color */
+  
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  
+  --shadow-premium: 0 20px 40px -10px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 30px rgba(79, 70, 229, 0.12);
+}
+
+/* Forest Green Theme */
+.theme-green {
+  --bg-primary: #040d0a;
+  --bg-secondary: #081a14;
+  --bg-tertiary: #0f2c22;
+  
+  --primary: #10b981;       /* Emerald */
+  --primary-glow: rgba(16, 185, 129, 0.25);
+  --secondary: #34d399;     /* Mint */
+  --secondary-glow: rgba(52, 211, 153, 0.25);
+  --accent: #059669;        /* Jade */
+  
+  --text-main: #ecfdf5;
+  --text-muted: #a7f3d0;
+  --text-dark: #059669;
+  
+  --glass-bg: rgba(8, 26, 20, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.04);
+  
+  --shadow-glow: 0 0 35px rgba(16, 185, 129, 0.25);
+}
+
+/* Cyber Orange Theme */
+.theme-orange {
+  --bg-primary: #0f0b07;
+  --bg-secondary: #19120c;
+  --bg-tertiary: #2a1f14;
+  
+  --primary: #f97316;       /* Warm Orange */
+  --primary-glow: rgba(249, 115, 22, 0.25);
+  --secondary: #facc15;     /* Amber Gold */
+  --secondary-glow: rgba(250, 204, 21, 0.25);
+  --accent: #fb923c;
+  
+  --text-main: #fffbeb;
+  --text-muted: #fcd34d;
+  --text-dark: #d97706;
+  
+  --glass-bg: rgba(25, 18, 12, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.04);
+  
+  --shadow-glow: 0 0 35px rgba(249, 115, 22, 0.25);
+}
+
+/* White Theme Specific Tweaks for text/overlays */
+.theme-white input::placeholder {
+  color: #9ca3af !important;
+}
+.theme-white .bento-panel:hover {
+  border-color: rgba(79, 70, 229, 0.15);
+}
+.theme-white .btn-primary {
+  color: #ffffff !important;
+}
+.theme-white .user-profile-tile {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+.theme-white .sidebar-footer {
+  border-top-color: rgba(0, 0, 0, 0.08) !important;
 }

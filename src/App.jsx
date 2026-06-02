@@ -327,6 +327,9 @@ export default function App() {
   const [userName, setUserName] = useState(() => {
     return localStorage.getItem('spoty_username') || '';
   });
+  const [activeTheme, setActiveTheme] = useState(() => {
+    return localStorage.getItem('spoty_color_theme') || 'terracotta';
+  });
   const [songs, setSongs] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -538,6 +541,31 @@ export default function App() {
       clearCoverCaches();
     };
   }, []);
+
+  // --- SYNCHRONIZE COLOR THEME ON HTML ROOT ---
+  useEffect(() => {
+    const rootEl = document.documentElement;
+    // Remove existing themes
+    rootEl.classList.remove('theme-terracotta', 'theme-black', 'theme-white', 'theme-green', 'theme-orange');
+    // Add current theme
+    rootEl.classList.add(`theme-${activeTheme}`);
+
+    // Dynamically update browser's mobile navigation/header background theme color
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.name = 'theme-color';
+      document.head.appendChild(themeMeta);
+    }
+    const themeColors = {
+      terracotta: '#150608',
+      black: '#050505',
+      white: '#eef1f6',
+      green: '#040d0a',
+      orange: '#0f0b07'
+    };
+    themeMeta.content = themeColors[activeTheme] || '#150608';
+  }, [activeTheme]);
 
   const loadLocalData = async () => {
     try {
@@ -1592,6 +1620,65 @@ export default function App() {
                 >
                   Change Name
                 </button>
+              </div>
+            </div>
+
+            {/* Theme Settings */}
+            <div className="bento-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>Accent & Color Theme</h4>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Personalize the accent colors and dynamic ambient lighting of your interface.</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                {[
+                  { id: 'terracotta', name: 'Terracotta Rose', color1: '#8e2e3e', color2: '#f3735d', desc: 'Warm Peach & Crimson' },
+                  { id: 'black', name: 'Carbon Black', color1: '#121212', color2: '#00e5ff', desc: 'Cyber Neon Electric' },
+                  { id: 'white', name: 'Frost White', color1: '#ffffff', color2: '#4f46e5', desc: 'Frosted Glass Light' },
+                  { id: 'green', name: 'Forest Green', color1: '#081a14', color2: '#10b981', desc: 'Moss & Emerald Jade' },
+                  { id: 'orange', name: 'Cyber Orange', color1: '#19120c', color2: '#f97316', desc: 'Warm Honey Amber' },
+                ].map((t) => {
+                  const isSelected = activeTheme === t.id;
+                  return (
+                    <div 
+                      key={t.id}
+                      onClick={() => {
+                        setActiveTheme(t.id);
+                        localStorage.setItem('spoty_color_theme', t.id);
+                        triggerNotification(`Theme switched to ${t.name}!`);
+                      }}
+                      className={`compact-song-card ${isSelected ? 'active-bg-card' : ''}`}
+                      style={{ 
+                        padding: '12px', 
+                        cursor: 'pointer', 
+                        position: 'relative',
+                        border: isSelected ? '1px solid var(--secondary)' : '1px solid transparent',
+                        borderRadius: '16px',
+                        background: 'var(--bg-primary)',
+                        transition: 'var(--transition-smooth)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                    >
+                      <div style={{ 
+                        height: '42px', 
+                        borderRadius: '8px', 
+                        background: `linear-gradient(135deg, ${t.color1} 0%, ${t.color2} 100%)`,
+                        border: '1px solid var(--glass-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        padding: '6px'
+                      }}>
+                        {isSelected && <span style={{ fontSize: '0.65rem', background: 'rgba(0,0,0,0.65)', padding: '2px 6px', borderRadius: '6px', color: 'white', fontWeight: 600 }}>ACTIVE</span>}
+                      </div>
+                      <div>
+                        <h5 style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>{t.name}</h5>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>{t.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

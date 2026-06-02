@@ -179,6 +179,11 @@ export default function App() {
   // --- ROTATING VIDEO BACKGROUND STATES ---
   const [bgVideoIndex, setBgVideoIndex] = useState(0);
   const [customBackgrounds, setCustomBackgrounds] = useState([]);
+  const [hiddenDefaultBgs, setHiddenDefaultBgs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('spoty_hidden_default_bgs') || '[]');
+    } catch { return []; }
+  });
   const [bgMode, setBgMode] = useState(() => {
     return localStorage.getItem('spoty_bg_mode') || 'rotate';
   });
@@ -189,21 +194,32 @@ export default function App() {
     return parseInt(localStorage.getItem('spoty_bg_rotate_time') || '30', 10);
   });
 
+  // Derive the list of visible (non-hidden) default backgrounds
+  const visibleDefaultBgs = DEFAULT_BG_LIST.filter(bg => !hiddenDefaultBgs.includes(bg.id));
+  const visibleDefaultVideos = visibleDefaultBgs.map(bg => bg.src);
+
   useEffect(() => {
     if (bgMode !== 'rotate') return;
+    if (visibleDefaultVideos.length === 0) return; // nothing to rotate
     const intervalMs = bgRotateTime * 1000;
     const interval = setInterval(() => {
-      setBgVideoIndex((prev) => (prev + 1) % BACKGROUND_VIDEOS.length);
+      setBgVideoIndex((prev) => (prev + 1) % visibleDefaultVideos.length);
     }, intervalMs); // cycle background dynamically
     return () => clearInterval(interval);
-  }, [bgMode, bgRotateTime]);
+  }, [bgMode, bgRotateTime, visibleDefaultVideos.length]);
 
   // --- BACKGROUND VIDEO STREAM RESOLVER ---
   const getActiveBackgroundSrc = () => {
     if (bgMode === 'rotate') {
-      return BACKGROUND_VIDEOS[bgVideoIndex];
+      if (visibleDefaultVideos.length === 0) return '/bg.mp4';
+      return visibleDefaultVideos[bgVideoIndex % visibleDefaultVideos.length];
     }
     if (activeBgId.startsWith('default-')) {
+      // Check if this default was hidden
+      if (hiddenDefaultBgs.includes(activeBgId)) {
+        // Fall back to first visible default or bg.mp4
+        return visibleDefaultVideos.length > 0 ? visibleDefaultVideos[0] : '/bg.mp4';
+      }
       const match = DEFAULT_BG_LIST.find(b => b.id === activeBgId);
       return match ? match.src : '/bg.mp4';
     }
@@ -280,6 +296,31 @@ export default function App() {
         triggerNotification("Failed to delete background.", "error");
       }
     }
+  };
+
+  const handleDeleteDefaultBackground = (id, e) => {
+    e.stopPropagation();
+    if (confirm("Remove this default background video? You can restore it later.")) {
+      const updated = [...hiddenDefaultBgs, id];
+      setHiddenDefaultBgs(updated);
+      localStorage.setItem('spoty_hidden_default_bgs', JSON.stringify(updated));
+      setBgVideoIndex(0); // reset rotation index
+      if (activeBgId === id) {
+        // Switch to rotate mode if the active background was removed
+        setBgMode('rotate');
+        localStorage.setItem('spoty_bg_mode', 'rotate');
+        setActiveBgId('default-1');
+        localStorage.setItem('spoty_active_bg_id', 'default-1');
+      }
+      triggerNotification("Default background removed.");
+    }
+  };
+
+  const handleRestoreAllDefaultBackgrounds = () => {
+    setHiddenDefaultBgs([]);
+    localStorage.setItem('spoty_hidden_default_bgs', JSON.stringify([]));
+    setBgVideoIndex(0);
+    triggerNotification("All default backgrounds restored!");
   };
 
   // --- CORE APPLICATION STATES ---
@@ -1624,7 +1665,7 @@ export default function App() {
               {/* Background Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', marginTop: '4px' }}>
                 {/* Default Background Cards */}
-                {DEFAULT_BG_LIST.map((bg) => {
+                {visibleDefaultBgs.map((bg) => {
                   const isActive = activeBgId === bg.id && bgMode === 'static';
                   return (
                     <div 
@@ -1646,11 +1687,45 @@ export default function App() {
                       </div>
                       <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Default</span>
-                        {isActive && <span style={{ fontSize: '0.7rem' }}>✅</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {isActive && <span style={{ fontSize: '0.7rem' }}>✅</span>}
+                          <button 
+                            onClick={(e) => handleDeleteDefaultBackground(bg.id, e)}
+                            style={{ background: 'none', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '0.8rem', padding: '2px' }}
+                            title="Remove this default background"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
+
+                {/* Restore All Defaults Button (shown only when some are hidden) */}
+                {hiddenDefaultBgs.length > 0 && (
+                  <div 
+                    onClick={handleRestoreAllDefaultBackgrounds}
+                    className="compact-song-card"
+                    style={{ 
+                      padding: '10px', 
+                      cursor: 'pointer', 
+                      position: 'relative',
+                      border: '1px dashed var(--secondary)',
+                      borderRadius: '16px',
+                      background: 'rgba(255,255,255,0.02)',
+                      transition: 'var(--transition-smooth)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>🔄</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--secondary)', fontWeight: 600, textAlign: 'center' }}>Restore {hiddenDefaultBgs.length} Hidden</span>
+                  </div>
+                )}
 
                 {/* Custom Background Cards */}
                 {customBackgrounds.map((bg) => {

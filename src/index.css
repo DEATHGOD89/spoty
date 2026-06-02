@@ -1,0 +1,239 @@
+:root {
+  /* Dynamic Crimson & Peach Bento Palette */
+  --bg-primary: #150608;       /* Deep Burgundy Black */
+  --bg-secondary: #1e0a0d;     /* Deep Crimson Card */
+  --bg-tertiary: #2a1115;      /* Warm Crimson Highlight */
+  
+  --primary: #8e2e3e;          /* Terracotta Crimson */
+  --primary-glow: rgba(142, 46, 62, 0.4);
+  --secondary: #f3735d;        /* Vivid Peach Orange */
+  --secondary-glow: rgba(243, 115, 93, 0.4);
+  --accent: #e2586e;           /* Rose Pink Accent */
+  
+  --text-main: #fdf6f6;
+  --text-muted: #b39b9e;
+  --text-dark: #755d60;
+  
+  --glass-bg: rgba(30, 10, 13, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(16px) saturate(180%);
+  
+  --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 30px rgba(243, 115, 93, 0.2);
+  
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-bounce: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Reset & Box Model */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium Scrollbars (Adapted to Crimson) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+/* Super Rounded Bento Panels */
+.bento-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  transition: var(--transition-smooth);
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0); /* Force hardware GPU layer promotion */
+  backface-visibility: hidden;
+}
+
+.bento-panel:hover {
+  border-color: rgba(243, 115, 93, 0.15);
+}
+
+/* Base Layout Container */
+#root {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: radial-gradient(circle at 15% 15%, rgba(243, 115, 93, 0.18) 0%, transparent 55%),
+              radial-gradient(circle at 85% 85%, rgba(142, 46, 62, 0.22) 0%, transparent 55%),
+              radial-gradient(circle at 50% 50%, rgba(226, 88, 110, 0.12) 0%, transparent 60%),
+              var(--bg-primary);
+  padding: 1.5rem;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.background-video-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0.45; /* Soft cinematic brightness */
+  will-change: transform;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
+}
+
+/* Button & Interactive styles */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: inherit;
+  transition: var(--transition-smooth);
+}
+
+button:focus {
+  outline: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: var(--text-main);
+  padding: 0.75rem 1.5rem;
+  border-radius: 20px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  box-shadow: var(--shadow-glow);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 35px rgba(243, 115, 93, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  padding: 0.75rem 1.5rem;
+  border-radius: 20px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-primary);
+  border-color: var(--secondary);
+  transform: translateY(-2px);
+}
+
+/* Typography styles */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #fff 40%, var(--text-muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-crimson {
+  background: linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(243, 115, 93, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(243, 115, 93, 0.4);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s var(--transition-smooth) forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Bento Cover Art Generator fallbacks */
+.dynamic-cover {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-main);
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 800;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}

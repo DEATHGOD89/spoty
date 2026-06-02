@@ -1,0 +1,43 @@
+name: spoty
+description: "A modern, responsive, offline-first cross-platform music player using Flutter."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Icons and visual components
+  cupertino_icons: ^1.0.5
+  
+  # State Management
+  flutter_riverpod: ^2.3.6
+  
+  # Database Storage (SQLite)
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0+1
+  path_provider: ^2.1.1
+  path: ^1.8.3
+
+  # Audio playback engine
+  just_audio: ^0.9.36
+  just_audio_background: ^0.0.1-beta.11
+
+  # Metadata & tag extraction
+  metadata_god: ^0.1.0
+
+  # Native interactions
+  file_picker: ^6.1.1
+  rxdart: ^0.27.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.1
+
+flutter:
+  uses-material-design: true

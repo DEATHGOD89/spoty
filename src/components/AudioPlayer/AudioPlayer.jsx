@@ -189,9 +189,9 @@ export default function AudioPlayer({
         {/* LEFT COMPONENT: Track Info */}
         <div className="track-info">
           <div className={`track-cover-container ${isPlaying ? 'spinning' : ''}`}>
-            {currentTrack.coverBlob ? (
+            {currentTrack.coverBlob || currentTrack.coverUrl ? (
               <img 
-                src={URL.createObjectURL(currentTrack.coverBlob)} 
+                src={currentTrack.coverUrl ? currentTrack.coverUrl : URL.createObjectURL(currentTrack.coverBlob)} 
                 alt={currentTrack.title} 
                 className="track-cover" 
               />

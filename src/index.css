@@ -38,7 +38,9 @@
 }
 
 body {
-  background-color: var(--bg-primary);
+  background: radial-gradient(circle at 15% 15%, var(--secondary-glow) 0%, transparent 55%),
+              radial-gradient(circle at 85% 85%, var(--primary-glow) 0%, transparent 55%),
+              var(--bg-primary);
   color: var(--text-main);
   font-family: var(--font-body);
   overflow: hidden;
@@ -64,7 +66,16 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--secondary);
+  background: var(--primary);
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-premium);
 }
 
 /* Super Rounded Bento Panels */
@@ -90,16 +101,15 @@ body {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: radial-gradient(circle at 15% 15%, var(--secondary-glow) 0%, transparent 55%),
-              radial-gradient(circle at 85% 85%, var(--primary-glow) 0%, transparent 55%),
-              var(--bg-primary);
+  background: transparent;
   padding: 1.5rem;
   overflow: hidden;
   position: relative;
   z-index: 1;
 }
 
-.background-video-layer {
+.background-video-layer,
+.background-image-layer {
   position: fixed;
   top: 0;
   left: 0;
@@ -345,4 +355,29 @@ h1, h2, h3, h4 {
 }
 .theme-white .sidebar-footer {
   border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Live Cloud Song Table Styles */
+.song-table-row:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  transform: translateY(-0.5px);
+}
+.song-table-row.active {
+  background: rgba(243, 115, 93, 0.08) !important;
+  border-color: var(--secondary) !important;
+}
+.theme-white .song-table-row:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+.theme-white .song-table-row.active {
+  background: rgba(79, 70, 229, 0.08) !important;
+}
+.cloud-play-hover-btn:hover {
+  transform: scale(1.1);
+}
+.cloud-play-hover-btn {
+  border-radius: 50%;
+}
+tr:hover .cloud-play-hover-btn {
+  opacity: 1 !important;
 }

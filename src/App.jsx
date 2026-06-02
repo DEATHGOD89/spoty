@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, 
   Plus, 
@@ -27,7 +27,8 @@ import {
   ListMusic,
   Download,
   Menu,
-  CheckCircle
+  CheckCircle,
+  Globe
 } from 'lucide-react';
 
 import UploadModal from './components/UploadModal/UploadModal';
@@ -43,6 +44,13 @@ import {
   deleteBackground
 } from './services/db';
 import { seedInitialSongsIfEmpty } from './services/seeder';
+import {
+  getCloudSongs,
+  uploadSongToCloud,
+  likeCloudSong,
+  deleteCloudSong,
+  isSupabaseConfigured
+} from './services/supabase';
 import { generateCoverGradient } from './components/SongCard/SongCard';
 
 import './App.css';
@@ -63,7 +71,9 @@ const formatTime = (secs) => {
 };
 
 const getCoverUrl = (track) => {
-  if (!track || !track.coverBlob) return null;
+  if (!track) return null;
+  if (track.coverUrl) return track.coverUrl; // Firebase Cloud Image URL
+  if (!track.coverBlob) return null;
   if (!coverUrlCache.has(track.id)) {
     coverUrlCache.set(track.id, URL.createObjectURL(track.coverBlob));
   }
@@ -161,15 +171,12 @@ function FolderCollage({ folderName, songs }) {
   );
 }
 
-const BACKGROUND_VIDEOS = ['/bg.mp4', '/bg2.mp4', '/bg3.mp4', '/bg4.mp4', '/bg5.mp4', '/bg6.mp4'];
-
 const DEFAULT_BG_LIST = [
-  { id: 'default-1', name: 'Ambient Cosmos', src: '/bg.mp4', isDefault: true },
-  { id: 'default-2', name: 'Cyber Neon Lights', src: '/bg2.mp4', isDefault: true },
-  { id: 'default-3', name: 'Abstract Dreamscape', src: '/bg3.mp4', isDefault: true },
-  { id: 'default-4', name: 'Sunset Drive', src: '/bg4.mp4', isDefault: true },
-  { id: 'default-5', name: 'Mystic Nebula', src: '/bg5.mp4', isDefault: true },
-  { id: 'default-6', name: 'Vibrant Waves', src: '/bg6.mp4', isDefault: true },
+  { id: 'default-1', name: 'Toji (No Cursed Energy)', src: 'bg_toji.jpg', isDefault: true, isImage: true },
+  { id: 'default-2', name: 'Zoro (King of Hell)', src: 'bg_zoro.jpg', isDefault: true, isImage: true },
+  { id: 'default-3', name: 'Eren (Freedom)', src: 'bg_eren.jpg', isDefault: true, isImage: true },
+  { id: 'default-4', name: 'Goku (Ultra Instinct)', src: 'bg_goku.jpg', isDefault: true, isImage: true },
+  { id: 'default-5', name: 'Itachi (Genjutsu Master)', src: 'bg_itachi.jpg', isDefault: true, isImage: true },
 ];
 
 // ==========================================================================
@@ -185,7 +192,7 @@ export default function App() {
     } catch { return []; }
   });
   const [bgMode, setBgMode] = useState(() => {
-    return localStorage.getItem('spoty_bg_mode') || 'rotate';
+    return localStorage.getItem('spoty_bg_mode') || 'static';
   });
   const [activeBgId, setActiveBgId] = useState(() => {
     return localStorage.getItem('spoty_active_bg_id') || 'default-1';
@@ -234,12 +241,26 @@ export default function App() {
     return '';
   };
 
+  const isActiveBackgroundAnImage = () => {
+    if (bgMode === 'disabled') return false;
+    if (bgMode === 'rotate') {
+      const activeDefault = visibleDefaultBgs[bgVideoIndex % visibleDefaultBgs.length];
+      return activeDefault ? !!activeDefault.isImage : false;
+    }
+    if (activeBgId.startsWith('default-')) {
+      const match = DEFAULT_BG_LIST.find(b => b.id === activeBgId);
+      return match ? !!match.isImage : false;
+    }
+    const matchCustom = customBackgrounds.find(b => b.id === activeBgId);
+    return matchCustom ? !!matchCustom.isImage : false;
+  };
+
   const handleSelectBackground = (id) => {
     setActiveBgId(id);
     localStorage.setItem('spoty_active_bg_id', id);
     setBgMode('static');
     localStorage.setItem('spoty_bg_mode', 'static');
-    triggerNotification("Background video locked!");
+    triggerNotification("Background locked!");
   };
 
   const handleUploadBackground = async (e) => {
@@ -247,12 +268,15 @@ export default function App() {
     if (!file) return;
 
     if (file.size > 20 * 1024 * 1024) {
-      triggerNotification("Video too large! Select a file < 20MB.", "error");
+      triggerNotification("File too large! Select a file < 20MB.", "error");
       return;
     }
 
-    if (!file.type.startsWith('video/')) {
-      triggerNotification("Please upload a valid MP4 video.", "error");
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      triggerNotification("Please upload a valid Image (PNG/JPG) or MP4 Video.", "error");
       return;
     }
 
@@ -261,6 +285,7 @@ export default function App() {
         id: 'bg-custom-' + Date.now(),
         name: file.name.substring(0, 24) || 'Custom Background',
         blob: file,
+        isImage: isImage,
         addedAt: Date.now()
       };
 
@@ -281,7 +306,7 @@ export default function App() {
 
   const handleDeleteBackground = async (id, e) => {
     e.stopPropagation();
-    if (confirm("Delete this custom background video permanently?")) {
+    if (confirm("Delete this custom background permanently?")) {
       try {
         await deleteBackground(id);
         if (customBgUrlCache.has(id)) {
@@ -333,6 +358,15 @@ export default function App() {
   const [activeTheme, setActiveTheme] = useState(() => {
     return localStorage.getItem('spoty_color_theme') || 'terracotta';
   });
+  
+  // --- CLOUD ONLINE MODE STATES ---
+  const [cloudSongs, setCloudSongs] = useState([]);
+  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+  const [isCloudConfigured, setIsCloudConfigured] = useState(() => isSupabaseConfigured());
+
+  const [sbUrl, setSbUrl] = useState(() => localStorage.getItem('spoty_supabase_url') || '');
+  const [sbAnonKey, setSbAnonKey] = useState(() => localStorage.getItem('spoty_supabase_anon_key') || '');
+
   const [songs, setSongs] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -356,12 +390,24 @@ export default function App() {
   // --- BULK SELECTION STATES (SETTINGS LIBRARY MANAGER) ---
   const [selectedFolderNames, setSelectedFolderNames] = useState([]);
   const [selectedSongIds, setSelectedSongIds] = useState([]);
+  const [songManagerSearch, setSongManagerSearch] = useState('');
+  const [songManagerLimit, setSongManagerLimit] = useState(50);
   
   // --- NON-BLOCKING MODAL STATES ---
   const [playlistModal, setPlaylistModal] = useState({ isOpen: false, song: null, mode: 'add' });
 
   // --- COMPUTED PROPERTIES ---
   const listeningHours = Math.round(songs.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600);
+
+  const filteredManagerSongs = songs.filter(song => {
+    if (!songManagerSearch.trim()) return true;
+    const q = songManagerSearch.toLowerCase().trim();
+    return song.title.toLowerCase().includes(q) || 
+           song.artist.toLowerCase().includes(q) || 
+           (song.album && song.album.toLowerCase().includes(q));
+  });
+
+  const displayedManagerSongs = filteredManagerSongs.slice(0, songManagerLimit);
 
   // --- DSP STATES ---
   const [eqGains, setEqGains] = useState([0,0,0,0,0,0,0,0,0,0]);
@@ -608,6 +654,53 @@ export default function App() {
       }
     } catch (err) {
       console.error('Failed to load local DB:', err);
+    }
+  };
+
+  // --- CLOUD ENGINE METHODS ---
+  const loadCloudData = async () => {
+    if (!isCloudConfigured) return;
+    setIsLoadingCloud(true);
+    try {
+      const clSongs = await getCloudSongs();
+      setCloudSongs(clSongs);
+    } catch (err) {
+      console.error("Error loading cloud library:", err);
+    } finally {
+      setIsLoadingCloud(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'cloud') {
+      loadCloudData();
+    }
+  }, [activeView, isCloudConfigured]);
+
+  const handleLikeCloudSong = async (songId) => {
+    try {
+      await likeCloudSong(songId);
+      // Update local state state to reflect like increment instantly
+      setCloudSongs(prev => 
+        prev.map(s => s.id === songId ? { ...s, likes: (s.likes || 0) + 1 } : s)
+      );
+      triggerNotification("Cloud track liked! ❤️");
+    } catch (e) {
+      console.error("Failed to like cloud song:", e);
+    }
+  };
+
+  const handleDeleteCloudSong = async (songId, songTitle) => {
+    if (!confirm(`Are you sure you want to permanently delete "${songTitle}" from the cloud library? This will also delete its files and free up your cloud storage.`)) {
+      return;
+    }
+    try {
+      await deleteCloudSong(songId);
+      setCloudSongs(prev => prev.filter(s => s.id !== songId));
+      triggerNotification("Cloud track deleted! 🗑️");
+    } catch (e) {
+      console.error("Failed to delete cloud song:", e);
+      alert("Failed to delete track from cloud: " + e.message);
     }
   };
 
@@ -1000,33 +1093,48 @@ export default function App() {
   };
 
   // Filters by search query and active filters
-  const filteredSongs = songs.filter((s) => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || s.genre.toLowerCase().includes(query);
-    
-    // Chip categories matching
-    if (selectedGenreChip === 'All') return matchesSearch;
-    if (selectedGenreChip === 'Favorites') return matchesSearch && s.isFavorite;
-    
-    const chipLabel = selectedGenreChip.toLowerCase();
-    const songGenre = s.genre ? s.genre.toLowerCase() : '';
-    return matchesSearch && songGenre.includes(chipLabel);
-  });
+  const filteredSongs = useMemo(() => {
+    return songs.filter((s) => {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || s.genre.toLowerCase().includes(query);
+      
+      // Chip categories matching
+      if (selectedGenreChip === 'All') return matchesSearch;
+      if (selectedGenreChip === 'Favorites') return matchesSearch && s.isFavorite;
+      
+      const chipLabel = selectedGenreChip.toLowerCase();
+      const songGenre = s.genre ? s.genre.toLowerCase() : '';
+      return matchesSearch && songGenre.includes(chipLabel);
+    });
+  }, [songs, searchQuery, selectedGenreChip]);
 
-  const displaySongs = getSortedSongs(filteredSongs);
-  const likedSongsList = songs.filter(s => s.isFavorite);
-  const librarySongs = displaySongs.filter(s => s.isFavorite);
+  const displaySongs = useMemo(() => {
+    return getSortedSongs(filteredSongs);
+  }, [filteredSongs, currentSort]);
+
+  const likedSongsList = useMemo(() => {
+    return songs.filter(s => s.isFavorite);
+  }, [songs]);
+
+  const librarySongs = useMemo(() => {
+    return displaySongs.filter(s => s.isFavorite);
+  }, [displaySongs]);
 
   // Extract unique genres dynamically for filter chips
-  const dynamicGenres = Array.from(
-    new Set(
-      songs
-        .map((s) => s.genre)
-        .filter(Boolean)
-        .map((g) => g.trim())
-    )
-  ).filter((g) => g !== "");
-  const genreChips = ['All', ...dynamicGenres, 'Favorites'];
+  const dynamicGenres = useMemo(() => {
+    return Array.from(
+      new Set(
+        songs
+          .map((s) => s.genre)
+          .filter(Boolean)
+          .map((g) => g.trim())
+      )
+    ).filter((g) => g !== "");
+  }, [songs]);
+
+  const genreChips = useMemo(() => {
+    return ['All', ...dynamicGenres, 'Favorites'];
+  }, [dynamicGenres]);
 
   // Sidebar navigations helper
   const navigateToView = (viewName) => {
@@ -1038,16 +1146,25 @@ export default function App() {
   return (
     <>
       {getActiveBackgroundSrc() && (
-        <video 
-          key={`${bgMode}-${activeBgId}-${bgMode === 'rotate' ? bgVideoIndex : ''}`}
-          autoPlay 
-          loop 
-          muted 
-          playsInline
-          className="background-video-layer"
-        >
-          <source src={getActiveBackgroundSrc()} type="video/mp4" />
-        </video>
+        isActiveBackgroundAnImage() ? (
+          <img 
+            key={`${bgMode}-${activeBgId}-${bgMode === 'rotate' ? bgVideoIndex : ''}`}
+            src={getActiveBackgroundSrc()} 
+            className="background-image-layer" 
+            alt="background"
+          />
+        ) : (
+          <video 
+            key={`${bgMode}-${activeBgId}-${bgMode === 'rotate' ? bgVideoIndex : ''}`}
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="background-video-layer"
+          >
+            <source src={getActiveBackgroundSrc()} type="video/mp4" />
+          </video>
+        )
       )}
 
       <audio 
@@ -1124,6 +1241,25 @@ export default function App() {
           >
             <Home size={16} />
             <span>Home</span>
+          </button>
+          <button 
+            className={`sidebar-nav-btn ${activeView === 'cloud' ? 'active' : ''}`}
+            onClick={() => navigateToView('cloud')}
+            style={{ position: 'relative' }}
+          >
+            <Globe size={16} />
+            <span>Global Cloud</span>
+            <span style={{ 
+              fontSize: '0.6rem', 
+              background: 'linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%)', 
+              color: 'white', 
+              padding: '1px 6px', 
+              borderRadius: '8px', 
+              marginLeft: 'auto',
+              fontWeight: 700 
+            }}>
+              LIVE
+            </span>
           </button>
           <button 
             className={`sidebar-nav-btn ${activeView === 'library' ? 'active' : ''}`}
@@ -1440,6 +1576,260 @@ export default function App() {
                 ))}
               </div>
             </div>
+          </section>
+        ) : activeView === 'cloud' ? (
+          /* ==========================================================
+             GLOBAL CLOUD PLAYLIST VIEW
+             ========================================================== */
+          <section className="home-viewport-scroll animate-fade-in">
+            {!isCloudConfigured ? (
+              // --- FORM: CONFIGURE SUPABASE ONLINE MODE ---
+              <div className="bento-panel animate-slide-in" style={{ padding: '30px', maxWidth: '650px', margin: '20px auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto', color: 'white' }}>
+                    <Globe size={28} />
+                  </div>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, marginBottom: '6px' }}>Configure Global Online Mode</h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                    Spoty is 100% serverless! You can configure your own private Supabase cloud project to upload and stream songs globally with friends. Enter your details below to activate.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="input-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Supabase Project URL</label>
+                    <input 
+                      type="text" 
+                      value={sbUrl} 
+                      onChange={(e) => setSbUrl(e.target.value.trim())}
+                      placeholder="https://your-project.supabase.co"
+                      style={{ padding: '10px 14px', background: 'var(--bg-primary)', color: 'white', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.8rem', outline: 'none' }}
+                    />
+                  </div>
+
+                  <div className="input-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Supabase Anonymous Key (Anon API Key)</label>
+                    <input 
+                      type="password" 
+                      value={sbAnonKey} 
+                      onChange={(e) => setSbAnonKey(e.target.value.trim())}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      style={{ padding: '10px 14px', background: 'var(--bg-primary)', color: 'white', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.8rem', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  className="btn-primary"
+                  onClick={() => {
+                    if (!sbUrl || !sbAnonKey) {
+                      alert("Please fill in both the Supabase URL and Anonymous Key to connect!");
+                      return;
+                    }
+                    localStorage.removeItem('spoty_supabase_disconnected');
+                    localStorage.setItem('spoty_supabase_url', sbUrl);
+                    localStorage.setItem('spoty_supabase_anon_key', sbAnonKey);
+                    
+                    setIsCloudConfigured(true);
+                    triggerNotification("Supabase Online Mode connected! 🎉");
+                  }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+                >
+                  <Globe size={18} />
+                  <span>Connect & Activate Online Cloud</span>
+                </button>
+              </div>
+            ) : (
+              // --- LIVE ONLINE CLOUD DASHBOARD ---
+              <div className="home-section-container">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <span className="home-sec-title">Global Cloud Library</span>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
+                      Streaming dynamically shared audio files uploaded by users globally via Supabase.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="btn-secondary"
+                      onClick={loadCloudData}
+                      disabled={isLoadingCloud}
+                      style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    >
+                      {isLoadingCloud ? 'Refreshing...' : '🔄 Refresh Shared'}
+                    </button>
+                    <button 
+                      className="btn-danger-outline"
+                      onClick={() => {
+                        if (confirm("Disconnect from cloud database and clear keys?")) {
+                          localStorage.setItem('spoty_supabase_disconnected', 'true');
+                          localStorage.removeItem('spoty_supabase_url');
+                          localStorage.removeItem('spoty_supabase_anon_key');
+                          
+                          setSbUrl('');
+                          setSbAnonKey('');
+                          
+                          setIsCloudConfigured(false);
+                          setCloudSongs([]);
+                          triggerNotification("Cloud disconnected.");
+                        }
+                      }}
+                      style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    >
+                      Disconnect Cloud
+                    </button>
+                  </div>
+                </div>
+
+                {/* DYNAMIC STORAGE CAPACITY BAR */}
+                <div className="bento-panel animate-fade-in" style={{ 
+                  padding: '14px 20px', 
+                  marginBottom: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  gap: '20px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--glass-border)',
+                  borderRadius: '12px',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>☁️ Cloud Storage Capacity</span>
+                      {cloudSongs.length >= 45 && (
+                        <span style={{ 
+                          fontSize: '0.65rem', 
+                          padding: '2px 8px', 
+                          background: cloudSongs.length >= 50 ? 'rgba(255, 75, 75, 0.1)' : 'rgba(255, 165, 0, 0.1)', 
+                          color: cloudSongs.length >= 50 ? '#ff4b4b' : '#ffa500', 
+                          borderRadius: '20px', 
+                          fontWeight: 700 
+                        }}>
+                          {cloudSongs.length >= 50 ? '🚨 FULL' : '⚠️ ALMOST FULL'}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Using {cloudSongs.length} of 50 slots • <strong>{Math.max(0, 50 - cloudSongs.length)} slots left</strong>
+                    </span>
+                  </div>
+
+                  <div style={{ flex: '1', minWidth: '150px', maxWidth: '300px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ width: '100%', height: '8px', background: 'var(--bg-primary)', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+                      <div style={{ 
+                        width: `${Math.min(100, (cloudSongs.length / 50) * 100)}%`, 
+                        height: '100%', 
+                        background: cloudSongs.length >= 50 ? 'linear-gradient(90deg, #ff4b4b, #ff7b7b)' : 'linear-gradient(90deg, var(--secondary), var(--accent))',
+                        borderRadius: '10px',
+                        transition: 'width 0.5s ease-in-out'
+                      }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      <span>{Math.round(cloudSongs.length * 8)} MB Est. Used</span>
+                      <span><strong>{Math.max(0, 400 - Math.round(cloudSongs.length * 8))} MB Remaining</strong> (of 400MB safety limit)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isLoadingCloud ? (
+                  <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>Syncing with Supabase...</span>
+                  </div>
+                ) : cloudSongs.length > 0 ? (
+                  <div className="bento-panel" style={{ padding: '12px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-dark)', height: '36px' }}>
+                          <th style={{ paddingLeft: '12px' }}># Title</th>
+                          <th>Album</th>
+                          <th>Genre</th>
+                          <th>Uploader</th>
+                          <th style={{ textAlign: 'right', paddingRight: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cloudSongs.map((song, idx) => {
+                          const isCurrent = currentTrack && currentTrack.id === song.id;
+                          const grad = generateCoverGradient(song.title);
+                          return (
+                            <tr 
+                              key={song.id} 
+                              className={`song-table-row ${isCurrent ? 'active' : ''}`}
+                              style={{ 
+                                height: '56px', 
+                                borderBottom: '1px solid rgba(255,255,255,0.01)',
+                                transition: 'var(--transition-smooth)',
+                                borderRadius: '12px'
+                              }}
+                            >
+                              <td style={{ paddingLeft: '12px', display: 'flex', alignItems: 'center', gap: '10px', height: '56px' }}>
+                                <div style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+                                  {song.coverUrl ? (
+                                    <img src={song.coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <div style={{ width: '100%', height: '100%', background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '0.75rem' }}>
+                                      {song.title.substring(0, 2).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <button 
+                                    onClick={() => handlePlaySong(song, cloudSongs)}
+                                    style={{ 
+                                      position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+                                      background: 'rgba(0,0,0,0.6)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                      opacity: isCurrent ? 1 : 0, transition: 'var(--transition-smooth)', cursor: 'pointer' 
+                                    }}
+                                    className="cloud-play-hover-btn"
+                                  >
+                                    {isCurrent && isPlaying ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" />}
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }} className="truncate">{song.title}</span>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }} className="truncate">{song.artist}</span>
+                                </div>
+                              </td>
+                              <td style={{ color: 'var(--text-muted)' }} className="truncate">{song.album}</td>
+                              <td>
+                                <span style={{ padding: '2px 8px', background: 'var(--bg-primary)', borderRadius: '6px', fontSize: '0.65rem', color: 'var(--secondary)' }}>
+                                  {song.genre}
+                                </span>
+                              </td>
+                              <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>👤 {song.uploader}</td>
+                              <td style={{ textAlign: 'right', paddingRight: '12px' }}>
+                                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                    <button 
+                                      onClick={() => handleLikeCloudSong(song.id)}
+                                      style={{ background: 'none', border: 'none', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                                      title="Like globally"
+                                    >
+                                      <Heart size={14} fill={song.likes > 0 ? "currentColor" : "none"} />
+                                      <span>{song.likes || 0}</span>
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteCloudSong(song.id, song.title)}
+                                      style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.8)', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                                      title="Delete from Cloud"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="bento-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Globe size={36} style={{ marginBottom: '8px', color: 'var(--text-dark)' }} />
+                    <h4>Cloud Library is Empty</h4>
+                    <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Click the "Upload MP3" button in sidebar and check the "Share with the world" toggle to upload the first track!</p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         ) : activeView === 'folders' ? (
           /* ==========================================================
@@ -1887,10 +2277,10 @@ export default function App() {
                   className="upload-bg-card-label"
                 >
                   <Plus size={20} className="text-muted" />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Upload MP4 Video</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Upload Image or MP4</span>
                   <input 
                     type="file" 
-                    accept="video/mp4" 
+                    accept="image/*,video/mp4" 
                     onChange={handleUploadBackground} 
                     style={{ display: 'none' }} 
                   />
@@ -2015,9 +2405,32 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Search input for large library optimization */}
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.05)' }}>
+                  <input 
+                    type="text"
+                    value={songManagerSearch}
+                    onChange={(e) => {
+                      setSongManagerSearch(e.target.value);
+                      setSongManagerLimit(50); // Reset limit when searching
+                    }}
+                    placeholder="Search songs to manage..."
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-main)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      fontSize: '0.75rem'
+                    }}
+                  />
+                </div>
+
                 <div className="settings-list-scroll">
-                  {songs.length > 0 ? (
-                    songs.map((song) => {
+                  {displayedManagerSongs.length > 0 ? (
+                    displayedManagerSongs.map((song) => {
                       const isSongSelected = selectedSongIds.includes(song.id);
                       return (
                         <div 
@@ -2055,7 +2468,28 @@ export default function App() {
                     })
                   ) : (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dark)', fontSize: '0.75rem' }}>
-                      No songs in library.
+                      {songs.length > 0 ? "No matching songs found." : "No songs in library."}
+                    </div>
+                  )}
+
+                  {filteredManagerSongs.length > songManagerLimit && (
+                    <div 
+                      onClick={() => setSongManagerLimit(prev => prev + 100)}
+                      style={{
+                        padding: '12px',
+                        textAlign: 'center',
+                        color: 'var(--secondary)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.02)',
+                        borderTop: '1px solid var(--glass-border)',
+                        transition: 'var(--transition-smooth)',
+                        userSelect: 'none'
+                      }}
+                      className="load-more-songs-row"
+                    >
+                      Show More Songs (+{filteredManagerSongs.length - songManagerLimit})
                     </div>
                   )}
                 </div>
@@ -2605,6 +3039,8 @@ export default function App() {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={handleUploadTrack}
+        isCloudConfigured={isCloudConfigured}
+        uploaderName={userName}
       />
 
       {/* --- PREMIUM PLAYLIST SELECTOR MODAL --- */}

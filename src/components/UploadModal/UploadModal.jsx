@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, UploadCloud, Music, Folder, Image as ImageIcon, CheckCircle, Loader, Layers } from 'lucide-react';
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js';
 import './UploadModal.css';
+import { uploadSongToCloud } from '../../services/supabase';
 
 const parseId3Tag = (file) => {
   return new Promise((resolve) => {
@@ -28,9 +29,10 @@ const parseId3Tag = (file) => {
   });
 };
 
-export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
+export default function UploadModal({ isOpen, onClose, onUploadSuccess, isCloudConfigured, uploaderName }) {
   // Tabs: 'song' or 'folder'
   const [activeTab, setActiveTab] = useState('song');
+  const [shareToCloud, setShareToCloud] = useState(false);
   
   // --- SINGLE SONG STATES ---
   const [file, setFile] = useState(null);
@@ -184,20 +186,55 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
       if (activeTab === 'song') {
         // --- Single song save ---
         if (!file) return;
-        setSaveProgress('Saving track metadata...');
-        const songData = {
-          id: timeNow.toString(),
-          title: title.trim() || cleanTitle || 'Untitled Song',
-          artist: artist.trim() || 'My Local Upload',
-          album: album.trim() || 'Single',
-          genre: genre.trim() || 'Electronic',
-          duration: duration || 180, // Default to 3:00 if length loading fails
-          audioBlob: file,
-          coverBlob: coverFile || null,
-          isUserUpload: true,
-          addedAt: timeNow
-        };
-        await onUploadSuccess(songData);
+        
+        let songData;
+        const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+
+        if (shareToCloud) {
+          setSaveProgress('Uploading audio file to cloud storage...');
+          // Call Supabase upload service
+          const cloudMeta = await uploadSongToCloud(
+            title.trim() || cleanTitle || 'Untitled Song',
+            artist.trim() || 'My Local Upload',
+            album.trim() || 'Single',
+            genre.trim() || 'Electronic',
+            file,
+            coverFile || null,
+            uploaderName
+          );
+
+          songData = {
+            id: cloudMeta.id,
+            title: cloudMeta.title,
+            artist: cloudMeta.artist,
+            album: cloudMeta.album,
+            genre: cloudMeta.genre,
+            duration: duration || 180,
+            url: cloudMeta.url,
+            coverUrl: cloudMeta.coverUrl,
+            isUserUpload: true,
+            isCloud: true,
+            uploader: cloudMeta.uploader,
+            addedAt: timeNow
+          };
+
+          // Cache reference in IndexedDB
+          await onUploadSuccess(songData);
+        } else {
+          songData = {
+            id: timeNow.toString(),
+            title: title.trim() || cleanTitle || 'Untitled Song',
+            artist: artist.trim() || 'My Local Upload',
+            album: album.trim() || 'Single',
+            genre: genre.trim() || 'Electronic',
+            duration: duration || 180, // Default to 3:00 if length loading fails
+            audioBlob: file,
+            coverBlob: coverFile || null,
+            isUserUpload: true,
+            addedAt: timeNow
+          };
+          await onUploadSuccess(songData);
+        }
       } else {
         // --- Bulk Folder Save ---
         if (folderFiles.length === 0) return;
@@ -250,7 +287,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
       }, 1500);
     } catch (err) {
       console.error('Error saving song:', err);
-      alert('Failed to save music. Ensure your local browser storage has enough space.');
+      alert('Failed to save music: ' + (err.message || err));
     } finally {
       setIsSaving(false);
       setSaveProgress('');
@@ -487,6 +524,32 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                   </div>
                 )}
               </>
+            )}
+
+            {/* Share to Cloud Toggle (Only if Supabase is configured & active song tab has a file selected) */}
+            {isCloudConfigured && activeTab === 'song' && file && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px', 
+                margin: '12px 0 6px 0',
+                padding: '10px 14px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px dashed var(--glass-border)',
+                borderRadius: '12px'
+              }}>
+                <input 
+                  type="checkbox" 
+                  id="shareToCloudCheckbox"
+                  checked={shareToCloud} 
+                  onChange={(e) => setShareToCloud(e.target.checked)}
+                  style={{ width: '15px', height: '15px', accentColor: 'var(--secondary)', cursor: 'pointer' }}
+                />
+                <label htmlFor="shareToCloudCheckbox" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                  <span>🌐 Share with the world (Upload to Cloud)</span>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 400 }}>Anyone using this website will be able to stream this song!</span>
+                </label>
+              </div>
             )}
 
             {/* Actions Footer */}

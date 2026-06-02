@@ -178,8 +178,8 @@ export default function PlaylistManager({
                       
                       {/* Song art */}
                       <div className="track-row-cover">
-                        {song.coverBlob ? (
-                          <img src={URL.createObjectURL(song.coverBlob)} alt="" />
+                        {song.coverBlob || song.coverUrl ? (
+                          <img src={song.coverUrl ? song.coverUrl : URL.createObjectURL(song.coverBlob)} alt="" />
                         ) : (
                           <div className="dynamic-cover-mini" style={{ background: songGradient }}>
                             {song.title.substring(0, 1).toUpperCase()}

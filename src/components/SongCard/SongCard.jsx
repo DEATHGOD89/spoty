@@ -42,9 +42,9 @@ export default function SongCard({
     <div className={`song-card glass-panel ${isActive ? 'active' : ''}`}>
       {/* Cover Artwork Container */}
       <div className="card-cover-container">
-        {song.coverBlob ? (
+        {song.coverBlob || song.coverUrl ? (
           <img 
-            src={URL.createObjectURL(song.coverBlob)} 
+            src={song.coverUrl ? song.coverUrl : URL.createObjectURL(song.coverBlob)} 
             alt={song.title} 
             className="card-cover-image" 
           />

@@ -210,25 +210,28 @@ export default function App() {
 
   // --- BACKGROUND VIDEO STREAM RESOLVER ---
   const getActiveBackgroundSrc = () => {
+    if (bgMode === 'disabled') {
+      return '';
+    }
     if (bgMode === 'rotate') {
-      if (visibleDefaultVideos.length === 0) return '/bg.mp4';
+      if (visibleDefaultVideos.length === 0) return '';
       return visibleDefaultVideos[bgVideoIndex % visibleDefaultVideos.length];
     }
     if (activeBgId.startsWith('default-')) {
       // Check if this default was hidden
       if (hiddenDefaultBgs.includes(activeBgId)) {
-        // Fall back to first visible default or bg.mp4
-        return visibleDefaultVideos.length > 0 ? visibleDefaultVideos[0] : '/bg.mp4';
+        // Fall back to first visible default or empty
+        return visibleDefaultVideos.length > 0 ? visibleDefaultVideos[0] : '';
       }
       const match = DEFAULT_BG_LIST.find(b => b.id === activeBgId);
-      return match ? match.src : '/bg.mp4';
+      return match ? match.src : '';
     }
     const matchCustom = customBackgrounds.find(b => b.id === activeBgId);
     if (matchCustom) {
       const url = getCustomBgUrl(matchCustom);
-      return url || '/bg.mp4';
+      return url || '';
     }
-    return '/bg.mp4';
+    return '';
   };
 
   const handleSelectBackground = (id) => {
@@ -1034,16 +1037,18 @@ export default function App() {
 
   return (
     <>
-      <video 
-        key={`${bgMode}-${activeBgId}-${bgMode === 'rotate' ? bgVideoIndex : ''}`}
-        autoPlay 
-        loop 
-        muted 
-        playsInline
-        className="background-video-layer"
-      >
-        <source src={getActiveBackgroundSrc()} type="video/mp4" />
-      </video>
+      {getActiveBackgroundSrc() && (
+        <video 
+          key={`${bgMode}-${activeBgId}-${bgMode === 'rotate' ? bgVideoIndex : ''}`}
+          autoPlay 
+          loop 
+          muted 
+          playsInline
+          className="background-video-layer"
+        >
+          <source src={getActiveBackgroundSrc()} type="video/mp4" />
+        </video>
+      )}
 
       <audio 
         ref={audioRef}
@@ -1691,7 +1696,7 @@ export default function App() {
                 </div>
                 
                 {/* Playback Mode Toggles */}
-                <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-primary)', padding: '4px', borderRadius: '12px', border: '1px solid var(--glass-border)', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-primary)', padding: '4px', borderRadius: '12px', border: '1px solid var(--glass-border)', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button 
                     className={`filter-btn-pill ${bgMode === 'rotate' ? 'active' : ''}`}
                     onClick={() => {
@@ -1745,6 +1750,18 @@ export default function App() {
                     style={{ padding: '6px 12px', fontSize: '0.72rem', borderRadius: '8px' }}
                   >
                     🔒 Static Lock
+                  </button>
+
+                  <button 
+                    className={`filter-btn-pill ${bgMode === 'disabled' ? 'active' : ''}`}
+                    onClick={() => {
+                      setBgMode('disabled');
+                      localStorage.setItem('spoty_bg_mode', 'disabled');
+                      triggerNotification("Video background disabled.");
+                    }}
+                    style={{ padding: '6px 12px', fontSize: '0.72rem', borderRadius: '8px' }}
+                  >
+                    🚫 Disable Video
                   </button>
                 </div>
               </div>

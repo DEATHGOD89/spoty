@@ -672,10 +672,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadCloudData();
+  }, [isCloudConfigured]);
+
+  useEffect(() => {
     if (activeView === 'cloud') {
       loadCloudData();
     }
-  }, [activeView, isCloudConfigured]);
+  }, [activeView]);
 
   const handleLikeCloudSong = async (songId) => {
     try {
@@ -761,15 +765,15 @@ export default function App() {
   useEffect(() => {
     if (!audioRef.current) return;
     const syncAudioPlayback = async () => {
-      if (currentTrack) {
+      if (mergedCurrentTrack) {
         let url = null;
-        if (currentTrack.audioBlob) {
-          if (!audioUrlCache.has(currentTrack.id)) {
-            audioUrlCache.set(currentTrack.id, URL.createObjectURL(currentTrack.audioBlob));
+        if (mergedCurrentTrack.audioBlob) {
+          if (!audioUrlCache.has(mergedCurrentTrack.id)) {
+            audioUrlCache.set(mergedCurrentTrack.id, URL.createObjectURL(mergedCurrentTrack.audioBlob));
           }
-          url = audioUrlCache.get(currentTrack.id);
-        } else if (currentTrack.url) {
-          url = currentTrack.url;
+          url = audioUrlCache.get(mergedCurrentTrack.id);
+        } else if (mergedCurrentTrack.url) {
+          url = mergedCurrentTrack.url;
         }
 
         if (url) {
@@ -794,7 +798,7 @@ export default function App() {
       }
     };
     syncAudioPlayback();
-  }, [currentTrack, isPlaying]);
+  }, [mergedCurrentTrack, isPlaying]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -1093,11 +1097,40 @@ export default function App() {
   };
 
   // Combined list of local offline songs and online cloud songs
+  // Combined list of local offline songs and online cloud songs
   const allSongs = useMemo(() => {
+    const cloudMap = new Map(cloudSongs.map(cs => [cs.id, cs]));
+    
+    // Process local songs: if they exist in cloud, merge cloud-authoritative fields (like coverUrl, url, likes)
+    const mergedLocalSongs = songs.map(localSong => {
+      const cloudSong = cloudMap.get(localSong.id);
+      if (cloudSong) {
+        return {
+          ...localSong,
+          // Cloud song takes precedence for coverUrl, url, likes since they are uploaded/stored in Supabase
+          coverUrl: cloudSong.coverUrl || localSong.coverUrl,
+          url: cloudSong.url || localSong.url,
+          likes: cloudSong.likes !== undefined ? cloudSong.likes : localSong.likes,
+          isCloud: true
+        };
+      }
+      return localSong;
+    });
+
     const localIds = new Set(songs.map(s => s.id));
     const uniqueCloudSongs = cloudSongs.filter(cs => !localIds.has(cs.id));
-    return [...songs, ...uniqueCloudSongs];
+
+    return [...mergedLocalSongs, ...uniqueCloudSongs];
   }, [songs, cloudSongs]);
+
+  const mergedCurrentTrack = useMemo(() => {
+    if (!currentTrack) return null;
+    return allSongs.find(s => s.id === currentTrack.id) || currentTrack;
+  }, [currentTrack, allSongs]);
+
+  const mergedRecentlyPlayed = useMemo(() => {
+    return recentlyPlayed.map(rp => allSongs.find(s => s.id === rp.id) || rp);
+  }, [recentlyPlayed, allSongs]);
 
   // Filters by search query and active filters
   const filteredSongs = useMemo(() => {
@@ -2718,7 +2751,7 @@ export default function App() {
           <section className="home-viewport-scroll animate-fade-in">
             
             {/* SECTION 2: Recently Played */}
-            {recentlyPlayed.length > 0 && (
+            {mergedRecentlyPlayed.length > 0 && (
               <div className="home-section-container">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span className="home-sec-title" style={{ margin: 0 }}>Recently Played</span>
@@ -2731,11 +2764,11 @@ export default function App() {
                   </button>
                 </div>
                 <div className="horizontal-scroll-row">
-                  {recentlyPlayed.map((song) => (
+                  {mergedRecentlyPlayed.map((song) => (
                     <div 
                       key={'recent-' + song.id}
                       className="compact-song-card"
-                      onClick={() => handlePlaySong(song, recentlyPlayed)}
+                      onClick={() => handlePlaySong(song, mergedRecentlyPlayed)}
                     >
                       <div className="card-artwork-box">
                         <TrackCover track={song} className="folder-collage-full" />
@@ -2744,7 +2777,7 @@ export default function App() {
                             className="card-overlay-btn play"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handlePlaySong(song, recentlyPlayed);
+                              handlePlaySong(song, mergedRecentlyPlayed);
                             }}
                             title="Play Song"
                           >
@@ -2890,20 +2923,20 @@ export default function App() {
       {/* ==========================================================================
          FOOTER: Compact Spotify-like bottom player bar
          ========================================================================== */}
-      {currentTrack && (
+      {mergedCurrentTrack && (
         <footer className="crimson-audio-deck animate-slide-in">
           {/* Left section: Track Info */}
           <div className="deck-track-info">
             <div className="deck-cover">
-              <TrackCover track={currentTrack} className="folder-collage-full" />
+              <TrackCover track={mergedCurrentTrack} className="folder-collage-full" />
             </div>
             <div className="deck-track-details">
-              <span className="deck-track-title truncate" title={currentTrack.title}>{currentTrack.title}</span>
-              <span className="deck-track-artist truncate">{currentTrack.artist}</span>
+              <span className="deck-track-title truncate" title={mergedCurrentTrack.title}>{mergedCurrentTrack.title}</span>
+              <span className="deck-track-artist truncate">{mergedCurrentTrack.artist}</span>
             </div>
             <button 
               className="deck-like-btn"
-              onClick={() => handleToggleFavorite(currentTrack)}
+              onClick={() => handleToggleFavorite(mergedCurrentTrack)}
               style={{
                 marginLeft: '12px',
                 background: 'none',
@@ -2912,17 +2945,17 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: currentTrack.isFavorite ? 'var(--secondary)' : 'var(--text-muted)',
+                color: mergedCurrentTrack.isFavorite ? 'var(--secondary)' : 'var(--text-muted)',
                 transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              title={currentTrack.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+              title={mergedCurrentTrack.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
             >
               <Heart 
                 size={14} 
-                fill={currentTrack.isFavorite ? 'var(--secondary)' : 'none'} 
-                style={{ filter: currentTrack.isFavorite ? 'drop-shadow(0 0 4px var(--secondary-glow))' : 'none' }}
+                fill={mergedCurrentTrack.isFavorite ? 'var(--secondary)' : 'none'} 
+                style={{ filter: mergedCurrentTrack.isFavorite ? 'drop-shadow(0 0 4px var(--secondary-glow))' : 'none' }}
               />
             </button>
           </div>

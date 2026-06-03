@@ -42,7 +42,8 @@
     },
     "files": [
       "dist/**/*",
-      "main.cjs"
+      "main.cjs",
+      "preload.cjs"
     ],
     "win": {
       "target": "nsis",

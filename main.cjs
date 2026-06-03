@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -11,6 +11,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs')
     },
   });
 
@@ -20,6 +21,24 @@ function createWindow() {
   // Remove default menu bar for a clean, premium desktop app appearance
   win.setMenuBarVisibility(false);
 }
+
+// Handle IPC messages for compact Mini-Player window resizing & positioning
+ipcMain.on('toggle-mini-player', (event, isMini) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (isMini) {
+    win.setSize(340, 390); // Perfect size to fit the vertical mini-card and window decorations
+    win.setAlwaysOnTop(true);
+    win.setResizable(false);
+    win.setMaximizable(false);
+  } else {
+    win.setAlwaysOnTop(false);
+    win.setResizable(true);
+    win.setMaximizable(true);
+    win.setSize(1280, 720);
+    win.center();
+  }
+});
 
 app.whenReady().then(() => {
   createWindow();

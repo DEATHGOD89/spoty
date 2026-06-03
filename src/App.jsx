@@ -28,7 +28,8 @@ import {
   Download,
   Menu,
   CheckCircle,
-  Globe
+  Globe,
+  Activity
 } from 'lucide-react';
 
 import UploadModal from './components/UploadModal/UploadModal';
@@ -386,6 +387,8 @@ export default function App() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [selectedGenreChip, setSelectedGenreChip] = useState('All');
   const [currentSort, setCurrentSort] = useState('Recently Added');
+  const [visualizerMode, setVisualizerMode] = useState('none'); // 'none', 'bars', 'circular', 'particles'
+  const [isMiniPlayer, setIsMiniPlayer] = useState(false);
 
   // --- BULK SELECTION STATES (SETTINGS LIBRARY MANAGER) ---
   const [selectedFolderNames, setSelectedFolderNames] = useState([]);
@@ -443,6 +446,91 @@ export default function App() {
   const mergedRecentlyPlayed = useMemo(() => {
     return recentlyPlayed.map(rp => allSongs.find(s => s.id === rp.id) || rp);
   }, [recentlyPlayed, allSongs]);
+
+  // Dynamic Ambient Glow Color extraction
+  useEffect(() => {
+    if (!mergedCurrentTrack) {
+      document.documentElement.style.setProperty('--glow-color-a', 'var(--primary)');
+      document.documentElement.style.setProperty('--glow-color-b', 'var(--secondary)');
+      document.documentElement.style.setProperty('--glow-color-c', 'var(--primary-glow)');
+      return;
+    }
+
+    let active = true;
+    const url = getCoverUrl(mergedCurrentTrack);
+
+    const fallbackColors = () => {
+      const text = mergedCurrentTrack.title;
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        hash = text.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h1 = Math.abs(hash % 360);
+      const h2 = (h1 + 45) % 360;
+      const h3 = (h1 + 180) % 360;
+      
+      document.documentElement.style.setProperty('--glow-color-a', `hsl(${h1}, 70%, 55%)`);
+      document.documentElement.style.setProperty('--glow-color-b', `hsl(${h2}, 80%, 45%)`);
+      document.documentElement.style.setProperty('--glow-color-c', `hsl(${h3}, 65%, 50%)`);
+    };
+
+    if (!url) {
+      fallbackColors();
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (!active) return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 5;
+        canvas.height = 5;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          fallbackColors();
+          return;
+        }
+        ctx.drawImage(img, 0, 0, 5, 5);
+        const data = ctx.getImageData(0, 0, 5, 5).data;
+        
+        const r1 = data[24], g1 = data[25], b1 = data[26];
+        const r2 = data[48], g2 = data[49], b2 = data[50];
+        const r3 = data[72], g3 = data[73], b3 = data[74];
+        
+        document.documentElement.style.setProperty('--glow-color-a', `rgb(${r1}, ${g1}, ${b1})`);
+        document.documentElement.style.setProperty('--glow-color-b', `rgb(${r2}, ${g2}, ${b2})`);
+        document.documentElement.style.setProperty('--glow-color-c', `rgb(${r3}, ${g3}, ${b3})`);
+      } catch (err) {
+        console.error("Failed to extract image colors:", err);
+        fallbackColors();
+      }
+    };
+    img.onerror = () => {
+      if (!active) return;
+      fallbackColors();
+    };
+    img.src = url;
+
+    return () => {
+      active = false;
+    };
+  }, [mergedCurrentTrack]);
+
+  const handleToggleVisualizer = () => {
+    const modes = ['none', 'bars', 'circular', 'particles'];
+    const nextIdx = (modes.indexOf(visualizerMode) + 1) % modes.length;
+    setVisualizerMode(modes[nextIdx]);
+  };
+
+  const handleToggleMiniPlayer = () => {
+    const nextMini = !isMiniPlayer;
+    if (window.electronAPI) {
+      window.electronAPI.toggleMiniPlayer(nextMini);
+    }
+    setIsMiniPlayer(nextMini);
+  };
 
   // --- DSP STATES ---
   const [eqGains, setEqGains] = useState([0,0,0,0,0,0,0,0,0,0]);
@@ -1238,6 +1326,16 @@ export default function App() {
         )
       )}
 
+      {/* Dynamic ambient color morphing glow balls */}
+      <div className="ambient-glow-layer">
+        <div className="ambient-glow-ball ambient-glow-ball-1" />
+        <div className="ambient-glow-ball ambient-glow-ball-2" />
+        <div className="ambient-glow-ball ambient-glow-ball-3" />
+      </div>
+
+      {/* Real-time HTML5 Frequency Visualizer Canvas */}
+      <AudioVisualizer analyser={analyserRef} mode={visualizerMode} />
+
       <audio 
         ref={audioRef}
         crossOrigin="anonymous"
@@ -1289,7 +1387,7 @@ export default function App() {
         })}
       </div>
 
-      <div className={`app-container ${isSidebarVisible ? '' : 'sidebar-collapsed'}`}>
+      <div className={`app-container ${isSidebarVisible ? '' : 'sidebar-collapsed'} ${isMiniPlayer ? 'mini-player-active' : ''}`}>
 
       {/* ==========================================================================
          SIDEBAR: Spotify-inspired navigation & playlists section
@@ -2994,6 +3092,13 @@ export default function App() {
           {/* Middle section: Compact media slider controls */}
           <div className="deck-player-controller">
             <div className="deck-buttons-row">
+              <button 
+                className={`deck-btn ${visualizerMode !== 'none' ? 'active' : ''}`}
+                onClick={handleToggleVisualizer}
+                title="Frequency Audio Visualizer Mode"
+              >
+                <Activity size={13} />
+              </button>
               <button className="deck-btn" onClick={() => setIsShuffle(!isShuffle)}>
                 <Shuffle size={13} className={isShuffle ? 'active' : ''} />
               </button>
@@ -3004,6 +3109,13 @@ export default function App() {
               <button className="deck-btn" onClick={handleNext}><SkipForward size={15} fill="currentColor" /></button>
               <button className="deck-btn" onClick={() => setIsLooping(!isLooping)}>
                 <Repeat size={13} className={isLooping ? 'active' : ''} />
+              </button>
+              <button 
+                className={`deck-btn ${isMiniPlayer ? 'active' : ''}`}
+                onClick={handleToggleMiniPlayer}
+                title={isMiniPlayer ? "Exit Mini-Player" : "Mini-Player Mode"}
+              >
+                <Disc size={13} />
               </button>
             </div>
 
@@ -3062,5 +3174,183 @@ export default function App() {
 
       {/* --- PREMIUM PLAYLIST SELECTOR MODAL --- */}
     </>
+  );
+}
+
+// ==========================================================================
+// COMPONENT: AudioVisualizer (High-performance React/Canvas Audio Visualizer)
+// ==========================================================================
+function AudioVisualizer({ analyser, mode }) {
+  const canvasRef = useRef(null);
+  const animationRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let particles = [];
+    const maxParticles = 70;
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize particles
+    const initParticles = () => {
+      particles = [];
+      for (let i = 0; i < maxParticles; i++) {
+        particles.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          size: Math.random() * 3 + 1,
+          speedX: Math.random() * 0.8 - 0.4,
+          speedY: Math.random() * 0.8 - 0.4,
+          baseAlpha: Math.random() * 0.4 + 0.15
+        });
+      }
+    };
+    initParticles();
+
+    const draw = () => {
+      if (mode === 'none') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      animationRef.current = requestAnimationFrame(draw);
+
+      const bufferLength = analyser?.current ? analyser.current.frequencyBinCount : 0;
+      const dataArray = new Uint8Array(bufferLength);
+      if (analyser?.current) {
+        analyser.current.getByteFrequencyData(dataArray);
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const style = getComputedStyle(document.documentElement);
+      const colorA = style.getPropertyValue('--glow-color-a').trim() || 'hsl(270, 70%, 55%)';
+      const colorB = style.getPropertyValue('--glow-color-b').trim() || 'hsl(330, 80%, 45%)';
+
+      if (mode === 'bars') {
+        const barWidth = (canvas.width / 60);
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < 60; i++) {
+          const val = dataArray[Math.floor(i * (bufferLength / 80))] || 0;
+          barHeight = (val / 255) * (canvas.height * 0.32);
+
+          const grad = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+          grad.addColorStop(0, colorB);
+          grad.addColorStop(1, colorA);
+
+          ctx.fillStyle = grad;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = colorB;
+
+          ctx.beginPath();
+          ctx.roundRect(x, canvas.height - barHeight, barWidth - 4, barHeight, [8, 8, 0, 0]);
+          ctx.fill();
+
+          ctx.shadowBlur = 0;
+          x += barWidth;
+        }
+      } else if (mode === 'circular') {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        let bassSum = 0;
+        for (let i = 0; i < 8; i++) {
+          bassSum += dataArray[i] || 0;
+        }
+        const bassAvg = bassSum / 8;
+        const pulse = 1 + (bassAvg / 255) * 0.16;
+
+        const baseRadius = Math.min(canvas.width, canvas.height) * 0.14;
+        const radius = baseRadius * pulse;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = colorB;
+        ctx.lineWidth = 5;
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = colorB;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        ctx.beginPath();
+        for (let i = 0; i < 100; i++) {
+          const angle = (i / 100) * Math.PI * 2;
+          const val = dataArray[Math.floor(i * (bufferLength / 150))] || 0;
+          const offset = (val / 255) * 40;
+          const r = radius + offset;
+
+          const x = centerX + Math.cos(angle) * r;
+          const y = centerY + Math.sin(angle) * r;
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.closePath();
+        ctx.strokeStyle = colorA;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else if (mode === 'particles') {
+        particles.forEach((p, idx) => {
+          const freqVal = dataArray[idx % Math.min(bufferLength, maxParticles)] || 0;
+          const speedBoost = 1 + (freqVal / 255) * 5;
+          const sizeBoost = (freqVal / 255) * 4;
+
+          p.x += p.speedX * speedBoost;
+          p.y += p.speedY * speedBoost;
+
+          if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size + sizeBoost, 0, Math.PI * 2);
+          ctx.fillStyle = idx % 2 === 0 ? colorA : colorB;
+          ctx.globalAlpha = Math.min(p.baseAlpha + (freqVal / 255) * 0.4, 0.8);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+      }
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animationRef.current);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [analyser, mode]);
+
+  if (mode === 'none') return null;
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: -1,
+        pointerEvents: 'none',
+        opacity: mode === 'particles' ? 0.38 : 0.26,
+        mixBlendMode: 'screen',
+      }}
+    />
   );
 }

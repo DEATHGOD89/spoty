@@ -409,6 +409,41 @@ export default function App() {
 
   const displayedManagerSongs = filteredManagerSongs.slice(0, songManagerLimit);
 
+  // Combined list of local offline songs and online cloud songs
+  const allSongs = useMemo(() => {
+    const cloudMap = new Map(cloudSongs.map(cs => [cs.id, cs]));
+    
+    // Process local songs: if they exist in cloud, merge cloud-authoritative fields (like coverUrl, url, likes)
+    const mergedLocalSongs = songs.map(localSong => {
+      const cloudSong = cloudMap.get(localSong.id);
+      if (cloudSong) {
+        return {
+          ...localSong,
+          // Cloud song takes precedence for coverUrl, url, likes since they are uploaded/stored in Supabase
+          coverUrl: cloudSong.coverUrl || localSong.coverUrl,
+          url: cloudSong.url || localSong.url,
+          likes: cloudSong.likes !== undefined ? cloudSong.likes : localSong.likes,
+          isCloud: true
+        };
+      }
+      return localSong;
+    });
+
+    const localIds = new Set(songs.map(s => s.id));
+    const uniqueCloudSongs = cloudSongs.filter(cs => !localIds.has(cs.id));
+
+    return [...mergedLocalSongs, ...uniqueCloudSongs];
+  }, [songs, cloudSongs]);
+
+  const mergedCurrentTrack = useMemo(() => {
+    if (!currentTrack) return null;
+    return allSongs.find(s => s.id === currentTrack.id) || currentTrack;
+  }, [currentTrack, allSongs]);
+
+  const mergedRecentlyPlayed = useMemo(() => {
+    return recentlyPlayed.map(rp => allSongs.find(s => s.id === rp.id) || rp);
+  }, [recentlyPlayed, allSongs]);
+
   // --- DSP STATES ---
   const [eqGains, setEqGains] = useState([0,0,0,0,0,0,0,0,0,0]);
   const [bassProfile, setBassProfile] = useState('Home Theater');
@@ -1095,42 +1130,6 @@ export default function App() {
     }
     return listCopy;
   };
-
-  // Combined list of local offline songs and online cloud songs
-  // Combined list of local offline songs and online cloud songs
-  const allSongs = useMemo(() => {
-    const cloudMap = new Map(cloudSongs.map(cs => [cs.id, cs]));
-    
-    // Process local songs: if they exist in cloud, merge cloud-authoritative fields (like coverUrl, url, likes)
-    const mergedLocalSongs = songs.map(localSong => {
-      const cloudSong = cloudMap.get(localSong.id);
-      if (cloudSong) {
-        return {
-          ...localSong,
-          // Cloud song takes precedence for coverUrl, url, likes since they are uploaded/stored in Supabase
-          coverUrl: cloudSong.coverUrl || localSong.coverUrl,
-          url: cloudSong.url || localSong.url,
-          likes: cloudSong.likes !== undefined ? cloudSong.likes : localSong.likes,
-          isCloud: true
-        };
-      }
-      return localSong;
-    });
-
-    const localIds = new Set(songs.map(s => s.id));
-    const uniqueCloudSongs = cloudSongs.filter(cs => !localIds.has(cs.id));
-
-    return [...mergedLocalSongs, ...uniqueCloudSongs];
-  }, [songs, cloudSongs]);
-
-  const mergedCurrentTrack = useMemo(() => {
-    if (!currentTrack) return null;
-    return allSongs.find(s => s.id === currentTrack.id) || currentTrack;
-  }, [currentTrack, allSongs]);
-
-  const mergedRecentlyPlayed = useMemo(() => {
-    return recentlyPlayed.map(rp => allSongs.find(s => s.id === rp.id) || rp);
-  }, [recentlyPlayed, allSongs]);
 
   // Filters by search query and active filters
   const filteredSongs = useMemo(() => {

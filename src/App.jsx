@@ -677,14 +677,25 @@ export default function App() {
       setCategories(Object.values(folderMap));
 
       // Restore recently played
-      const savedRecentIds = localStorage.getItem('spoty_recent_ids');
-      if (savedRecentIds) {
+      const savedRecentSongs = localStorage.getItem('spoty_recent_songs');
+      if (savedRecentSongs) {
         try {
-          const ids = JSON.parse(savedRecentIds);
-          const matched = ids.map(id => localSongs.find(s => s.id === id)).filter(Boolean);
-          setRecentlyPlayed(matched);
+          const parsed = JSON.parse(savedRecentSongs);
+          setRecentlyPlayed(parsed);
         } catch (e) {
           console.error(e);
+        }
+      } else {
+        // Fallback to legacy spoty_recent_ids
+        const savedRecentIds = localStorage.getItem('spoty_recent_ids');
+        if (savedRecentIds) {
+          try {
+            const ids = JSON.parse(savedRecentIds);
+            const matched = ids.map(id => localSongs.find(s => s.id === id)).filter(Boolean);
+            setRecentlyPlayed(matched);
+          } catch (e) {
+            console.error(e);
+          }
         }
       }
     } catch (err) {
@@ -782,7 +793,27 @@ export default function App() {
     setRecentlyPlayed(prev => {
       const filtered = prev.filter(s => s.id !== track.id);
       const updated = [track, ...filtered].slice(0, 10);
+      
+      // Save legacy IDs
       localStorage.setItem('spoty_recent_ids', JSON.stringify(updated.map(s => s.id)));
+      
+      // Save lightweight song metadata (strip heavy coverBlob/audioBlob to keep localStorage clean)
+      const cleanUpdated = updated.map(s => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        genre: s.genre,
+        duration: s.duration,
+        coverUrl: s.coverUrl,
+        url: s.url,
+        isCloud: s.isCloud,
+        isFavorite: s.isFavorite,
+        likes: s.likes,
+        addedAt: s.addedAt
+      }));
+      localStorage.setItem('spoty_recent_songs', JSON.stringify(cleanUpdated));
+      
       return updated;
     });
 
@@ -987,6 +1018,7 @@ export default function App() {
     if (confirm("Clear your recently played list?")) {
       setRecentlyPlayed([]);
       localStorage.removeItem('spoty_recent_ids');
+      localStorage.removeItem('spoty_recent_songs');
       triggerNotification("Recently played list cleared.");
     }
   };

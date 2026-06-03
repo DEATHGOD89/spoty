@@ -514,6 +514,40 @@
   color: var(--text-main);
 }
 
+/* Safe Premium Delete Badge at Top-Right of Artwork container */
+.card-delete-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(21, 6, 8, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.compact-song-card:hover .card-delete-badge {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card-delete-badge:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
 .card-details-box {
   display: flex;
   flex-direction: column;

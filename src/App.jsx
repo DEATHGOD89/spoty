@@ -1092,11 +1092,18 @@ export default function App() {
     return listCopy;
   };
 
+  // Combined list of local offline songs and online cloud songs
+  const allSongs = useMemo(() => {
+    const localIds = new Set(songs.map(s => s.id));
+    const uniqueCloudSongs = cloudSongs.filter(cs => !localIds.has(cs.id));
+    return [...songs, ...uniqueCloudSongs];
+  }, [songs, cloudSongs]);
+
   // Filters by search query and active filters
   const filteredSongs = useMemo(() => {
-    return songs.filter((s) => {
+    return allSongs.filter((s) => {
       const query = searchQuery.toLowerCase();
-      const matchesSearch = s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || s.genre.toLowerCase().includes(query);
+      const matchesSearch = s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || (s.genre && s.genre.toLowerCase().includes(query));
       
       // Chip categories matching
       if (selectedGenreChip === 'All') return matchesSearch;
@@ -1106,15 +1113,15 @@ export default function App() {
       const songGenre = s.genre ? s.genre.toLowerCase() : '';
       return matchesSearch && songGenre.includes(chipLabel);
     });
-  }, [songs, searchQuery, selectedGenreChip]);
+  }, [allSongs, searchQuery, selectedGenreChip]);
 
   const displaySongs = useMemo(() => {
     return getSortedSongs(filteredSongs);
   }, [filteredSongs, currentSort]);
 
   const likedSongsList = useMemo(() => {
-    return songs.filter(s => s.isFavorite);
-  }, [songs]);
+    return allSongs.filter(s => s.isFavorite);
+  }, [allSongs]);
 
   const librarySongs = useMemo(() => {
     return displaySongs.filter(s => s.isFavorite);
@@ -1124,13 +1131,13 @@ export default function App() {
   const dynamicGenres = useMemo(() => {
     return Array.from(
       new Set(
-        songs
+        allSongs
           .map((s) => s.genre)
           .filter(Boolean)
           .map((g) => g.trim())
       )
     ).filter((g) => g !== "");
-  }, [songs]);
+  }, [allSongs]);
 
   const genreChips = useMemo(() => {
     return ['All', ...dynamicGenres, 'Favorites'];
@@ -1884,7 +1891,7 @@ export default function App() {
                 // Detailed view of selected playlist
                 (() => {
                   const pl = playlists.find(p => p.id === activePlaylistId);
-                  const plSongs = (pl.songIds || []).map(id => songs.find(s => s.id === id)).filter(Boolean);
+                  const plSongs = (pl.songIds || []).map(id => allSongs.find(s => s.id === id)).filter(Boolean);
                   
                   return (
                     <div className="bento-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2606,40 +2613,22 @@ export default function App() {
                           >
                             <Play size={18} fill="currentColor" style={{ marginLeft: '2px' }} />
                           </button>
-                          
-                          <button 
-                            className="card-overlay-btn delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSingleSong(song.id, song.title);
-                            }}
-                            title="Delete Song"
-                            style={{
-                              marginLeft: '8px',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#ef4444',
-                              borderRadius: '50%',
-                              width: '36px',
-                              height: '36px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'scale(1.15)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.35)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
                         </div>
+
+                        <button 
+                          className="card-delete-badge"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (song.isCloud) {
+                              handleDeleteCloudSong(song.id, song.title);
+                            } else {
+                              handleDeleteSingleSong(song.id, song.title);
+                            }
+                          }}
+                          title="Delete Song"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
 
                       <div className="card-details-box">
@@ -2761,40 +2750,22 @@ export default function App() {
                           >
                             <Play size={18} fill="currentColor" style={{ marginLeft: '2px' }} />
                           </button>
-                          
-                          <button 
-                            className="card-overlay-btn delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSingleSong(song.id, song.title);
-                            }}
-                            title="Delete Song"
-                            style={{
-                              marginLeft: '8px',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#ef4444',
-                              borderRadius: '50%',
-                              width: '36px',
-                              height: '36px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'scale(1.15)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.35)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
                         </div>
+
+                        <button 
+                          className="card-delete-badge"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (song.isCloud) {
+                              handleDeleteCloudSong(song.id, song.title);
+                            } else {
+                              handleDeleteSingleSong(song.id, song.title);
+                            }
+                          }}
+                          title="Delete Song"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                       <div className="card-details-box">
                         <span className="card-title truncate" title={song.title}>{song.title}</span>
@@ -2880,40 +2851,22 @@ export default function App() {
                           >
                             <Play size={18} fill="currentColor" style={{ marginLeft: '2px' }} />
                           </button>
-                          
-                          <button 
-                            className="card-overlay-btn delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSingleSong(song.id, song.title);
-                            }}
-                            title="Delete Song"
-                            style={{
-                              marginLeft: '8px',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#ef4444',
-                              borderRadius: '50%',
-                              width: '36px',
-                              height: '36px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'scale(1.15)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.35)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
                         </div>
+
+                        <button 
+                          className="card-delete-badge"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (song.isCloud) {
+                              handleDeleteCloudSong(song.id, song.title);
+                            } else {
+                              handleDeleteSingleSong(song.id, song.title);
+                            }
+                          }}
+                          title="Delete Song"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
 
                       <div className="card-details-box">

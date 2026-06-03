@@ -220,42 +220,10 @@ function writeString(view, offset, string) {
  */
 export async function seedInitialSongsIfEmpty() {
   try {
-    const existing = await getAllSongs();
-    if (existing && existing.length > 0) {
-      console.log('Database already has songs. Skipping seeder.');
-      return;
-    }
-    
-    console.log('Seeding initial offline songs in background...');
-    
-    // Track 1: Procedural Synth Loop 1 (Ambient Chords)
-    const audioBlob1 = await generateProceduralTrack('Digital Dreams', 220, 'sine');
-    await saveSong({
-      id: 'seed-1',
-      title: 'Digital Dreams',
-      artist: 'Spoty Synth Engine',
-      album: 'Procedural Waves',
-      genre: 'Ambient',
-      duration: 10,
-      audioBlob: audioBlob1,
-      isUserUpload: true
-    });
-
-    // Track 2: Procedural Synth Loop 2 (Rhythmic Arpeggio)
-    const audioBlob2 = await generateProceduralTrack('Neon Pulsar', 146.83, 'triangle');
-    await saveSong({
-      id: 'seed-2',
-      title: 'Neon Pulsar',
-      artist: 'Spoty Synth Engine',
-      album: 'Procedural Waves',
-      genre: 'Techno',
-      duration: 10,
-      audioBlob: audioBlob2,
-      isUserUpload: true
-    });
-    
-    console.log('Successfully seeded database with procedural loops!');
+    // Proactively remove any previously seeded default loop tracks to keep the library 100% clean
+    await deleteSong('seed-1');
+    await deleteSong('seed-2');
   } catch (error) {
-    console.error('Error seeding initial songs:', error);
+    console.error('Error cleaning up seeded songs:', error);
   }
 }

@@ -79,6 +79,8 @@ export async function saveSong(song) {
       audioBlob: song.audioBlob || null,
       coverBlob: song.coverBlob || null,
       url: song.url || null,
+      coverUrl: song.coverUrl || null,
+      isCloud: song.isCloud !== undefined ? song.isCloud : false,
       coverGradient: song.coverGradient || null,
       isFavorite: song.isFavorite !== undefined ? song.isFavorite : false,
       isUserUpload: song.isUserUpload !== undefined ? song.isUserUpload : true,

@@ -27,3 +27,10 @@ public/*.mp4
 *.njsproj
 *.sln
 *.sw?
+
+# Electron Builder
+dist-electron/
+win-unpacked/
+builder-debug.yml
+.icon-ico/
+

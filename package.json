@@ -38,7 +38,7 @@
     "appId": "com.spoty.player",
     "productName": "Spoty",
     "directories": {
-      "output": "dist-desktop"
+      "output": "dist-electron"
     },
     "files": [
       "dist/**/*",

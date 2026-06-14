@@ -38,9 +38,7 @@
 }
 
 body {
-  background: radial-gradient(circle at 15% 15%, var(--secondary-glow) 0%, transparent 55%),
-              radial-gradient(circle at 85% 85%, var(--primary-glow) 0%, transparent 55%),
-              var(--bg-primary);
+  background: var(--bg-primary);
   color: var(--text-main);
   font-family: var(--font-body);
   overflow: hidden;
@@ -118,9 +116,9 @@ body {
   object-fit: cover;
   z-index: -2;
   pointer-events: none;
-  opacity: 0.45; /* Soft cinematic brightness */
+  opacity: 1;
   will-change: transform;
-  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
+  transform: translate3d(0, 0, 0);
 }
 
 /* Button & Interactive styles */
@@ -383,74 +381,12 @@ tr:hover .cloud-play-hover-btn {
 }
 
 /* ==========================================================================
-   AMBIENT GLOW SYSTEM & FLOATING ORB LAYER
+   GLOW CSS VARIABLES (retained for dynamic ambient color extraction)
    ========================================================================== */
 :root {
   --glow-color-a: var(--primary);
   --glow-color-b: var(--secondary);
   --glow-color-c: var(--primary-glow);
-}
-
-.ambient-glow-layer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-  mix-blend-mode: screen; /* Blends colors dynamically over backgrounds */
-}
-
-.ambient-glow-ball {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  will-change: transform;
-  transition: background 1.5s ease-in-out;
-}
-
-.ambient-glow-ball-1 {
-  width: 90vw;
-  height: 90vw;
-  background: radial-gradient(circle, var(--glow-color-a) 0%, rgba(0,0,0,0) 80%);
-  top: -25vh;
-  left: -20vw;
-  animation: floatGlow1 30s infinite alternate ease-in-out;
-}
-
-.ambient-glow-ball-2 {
-  width: 80vw;
-  height: 80vw;
-  background: radial-gradient(circle, var(--glow-color-b) 0%, rgba(0,0,0,0) 80%);
-  bottom: -20vh;
-  right: -15vw;
-  animation: floatGlow2 35s infinite alternate ease-in-out;
-}
-
-.ambient-glow-ball-3 {
-  width: 70vw;
-  height: 70vw;
-  background: radial-gradient(circle, var(--glow-color-c) 0%, rgba(0,0,0,0) 80%);
-  top: 25vh;
-  left: 35vw;
-  animation: floatGlow3 25s infinite alternate ease-in-out;
-}
-
-@keyframes floatGlow1 {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(12vw, 15vh, 0) scale(1.15); }
-}
-
-@keyframes floatGlow2 {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-10vw, -12vh, 0) scale(1.1); }
-}
-
-@keyframes floatGlow3 {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(8vw, -8vh, 0) scale(1.2); }
 }
 
 /* ==========================================================================

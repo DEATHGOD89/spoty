@@ -174,10 +174,6 @@ function FolderCollage({ folderName, songs }) {
 
 const DEFAULT_BG_LIST = [
   { id: 'default-1', name: 'Toji (No Cursed Energy)', src: 'bg_toji.jpg', isDefault: true, isImage: true },
-  { id: 'default-2', name: 'Zoro (King of Hell)', src: 'bg_zoro.jpg', isDefault: true, isImage: true },
-  { id: 'default-3', name: 'Eren (Freedom)', src: 'bg_eren.jpg', isDefault: true, isImage: true },
-  { id: 'default-4', name: 'Goku (Ultra Instinct)', src: 'bg_goku.jpg', isDefault: true, isImage: true },
-  { id: 'default-5', name: 'Itachi (Genjutsu Master)', src: 'bg_itachi.jpg', isDefault: true, isImage: true },
 ];
 
 // ==========================================================================
@@ -447,7 +443,7 @@ export default function App() {
     return recentlyPlayed.map(rp => allSongs.find(s => s.id === rp.id) || rp);
   }, [recentlyPlayed, allSongs]);
 
-  // Dynamic Ambient Glow Color extraction
+  // Dynamic Ambient Glow Color extraction (kept for visualizer/particle colors)
   useEffect(() => {
     if (!mergedCurrentTrack) {
       document.documentElement.style.setProperty('--glow-color-a', 'var(--primary)');
@@ -588,7 +584,7 @@ export default function App() {
 
       const subBass = ctx.createBiquadFilter();
       subBass.type = 'lowshelf';
-      subBass.frequency.value = 60;
+      subBass.frequency.value = 40;
       subBassRef.current = subBass;
 
       const punchBass = ctx.createBiquadFilter();
@@ -642,18 +638,18 @@ export default function App() {
   };
 
   const BASS_PROFILE_MAP = {
-    'Studio Bass': { sub: 2, punch: 1 },
-    'Home Theater': { sub: 8, punch: 4 },
-    'Car Bass': { sub: 10, punch: 6 },
-    'DJ Bass': { sub: 6, punch: 8 },
-    'Cinema Bass': { sub: 9, punch: 5 },
-    'Punjabi Bass': { sub: 8, punch: 7 },
-    'Workout Bass': { sub: 7, punch: 8 }
+    'Studio Bass': { sub: 6, punch: 4 },
+    'Home Theater': { sub: 16, punch: 10 },
+    'Car Bass': { sub: 20, punch: 14 },
+    'DJ Bass': { sub: 14, punch: 16 },
+    'Cinema Bass': { sub: 18, punch: 12 },
+    'Punjabi Bass': { sub: 18, punch: 16 },
+    'Workout Bass': { sub: 16, punch: 18 }
   };
 
   useEffect(() => {
     const profile = BASS_PROFILE_MAP[bassProfile] || BASS_PROFILE_MAP['Home Theater'];
-    const multiplier = subwooferLevel / 50.0;
+    const multiplier = subwooferLevel / 30.0;
     
     if (subBassRef.current) subBassRef.current.gain.value = profile.sub * multiplier;
     if (punchBassRef.current) punchBassRef.current.gain.value = profile.punch * multiplier;
@@ -1325,13 +1321,6 @@ export default function App() {
           </video>
         )
       )}
-
-      {/* Dynamic ambient color morphing glow balls */}
-      <div className="ambient-glow-layer">
-        <div className="ambient-glow-ball ambient-glow-ball-1" />
-        <div className="ambient-glow-ball ambient-glow-ball-2" />
-        <div className="ambient-glow-ball ambient-glow-ball-3" />
-      </div>
 
       {/* Real-time HTML5 Frequency Visualizer Canvas */}
       <AudioVisualizer analyser={analyserRef} mode={visualizerMode} />
